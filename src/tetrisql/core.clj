@@ -56,7 +56,7 @@ The columns id and meta will be created automatically."
                                    ""
                                    ", "))))))
                     ");"))
-    (get-entity :tblname)))
+    (get-entity tblname)))
 
 (defn drop-table! "Just as the name says - this drops a table."
   [tblname]
@@ -276,11 +276,11 @@ but inserts certain columns by default.
 prefixname: A name for the function.
 columns: A list of column definitions, with the same syntax as in create-table!."
   ([prefixname columns]
-     `(fn ~prefixname [tblname cols]
-        (create-table! tblname (conj cols ~columns))))
+     `(fn ~prefixname [tblname# cols#]
+        (create-table! tblname# (flatten (conj ~columns cols#)))))
   ([columns]
-     `(fn [tblname cols]
-        (create-table! tblname (conj cols ~columns)))))
+     `(fn [tblname# cols#]
+        (create-table! tblname# (flatten (conj ~columns cols#))))))
 
 (defmacro dotbl* "This works the same as insert*, select*, update*, delete* with a little addition
 that you have to say which action to use.

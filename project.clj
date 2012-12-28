@@ -1,4 +1,4 @@
-(defproject tetrisql "0.1.4-SNAPSHOT"
+(defproject tetrisql "0.1.5-SNAPSHOT"
   :description "Drop-in add-on to sqlkorma."
   :url "http://www.github.com/zilti/tetrisql"
   :license {:name "Eclipse Public License"
