@@ -3,6 +3,8 @@
 A drop-in replacement for korma's scarce entity management and a tool to manage your tables and columns.
 
 ## Usage
+
+### Beginner
 Get the game:
 ```clojure
 [tetrisql "0.1.0-SNAPSHOT"]
@@ -37,11 +39,23 @@ Decide wisely where to put your bricks
                  :type "BIGINT"
                  :default 0}])
 ```
+Personalize them
+```clojure
+(dotbl insert player
+       (korma/values {:name "zilti"
+                      :points 50000}))
+```
+
 And rearrange them later
 ```clojure
-(create-column!
- :player {:name "anger_level"
-          :type "BIGINT"})
+(if (table-exists? :player)
+    (create-column!
+     :player {:name "anger_level"
+              :type "BIGINT"}))
+
+(-> (dotbl* update player
+            (korma/set-fields {:anger_level 180})
+            (korma/where {:name "zilti"})))
 ```
 Connect them
 ```clojure
@@ -60,6 +74,16 @@ Or just throw them all away
 ```
 
 Your game will be saved automatically.
+
+### Expert
+TetriSQL has a drop-in replacement for Korma's modification statements.
+If they're not sufficient at one place, you can still fall back to use the default ones and get your entities like this:
+```clojure
+(bootstrap-entity :tblname) ;; This creates an empty entity and inserts it into TetriSQL's config.
+		  	    ;; You probably won't need this as entities are implicitly created with
+			    ;; create-table! and removed with drop-table!
+(relations-select* :tblname) ;; Prepares a korma select* statement to include all relations.
+```
 
 ## License
 

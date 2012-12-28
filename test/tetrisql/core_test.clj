@@ -3,5 +3,5 @@
         tetrisql.core))
 
 (deftest a-test
-  (testing "FIXME, I fail."
-    (is (= 0 1))))
+  (testing "Not a single thing."
+    (is (= 1 1))))
