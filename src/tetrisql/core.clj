@@ -123,7 +123,8 @@ Operators:
                    (create-rel (-> tbl2 keyword get-entity)
                                (-> tbl1 keyword get-entity)
                                :has-many nil)))))
-           (create-column! tbl1 {:name (str (name tbl2) "_id")} nil))
+           (create-column! tbl1 {:name (str (name tbl2) "_id")
+                                 :type "BIGINT"} nil))
       :< (create-relation! tbl2 :> tbl1)
       := (do
            (swap!
@@ -141,7 +142,8 @@ Operators:
                    (create-rel (-> tbl2 keyword get-entity)
                                (-> tbl1 keyword get-entity)
                                :belongs-to nil)))))
-           (create-column! tbl2 {:name (str (name tbl1) "_id")} nil))
+           (create-column! tbl2 {:name (str (name tbl1) "_id")
+                                 :type "BIGINT"} nil))
       :>< (do
             (swap!
              db-config
@@ -164,8 +166,10 @@ Operators:
                                 {:join-table (str (name tbl1) "_" (name tbl2))
                                  :lfk (str (name tbl2) "_id")
                                  :efk (str (name tbl1) "_id")})))))
-            (create-column! tbl1 {:name (str (name tbl2) "_id")} nil)
-            (create-column! tbl2 {:name (str (name tbl1) "_id")} nil)
+            (create-column! tbl1 {:name (str (name tbl2) "_id")
+                                  :type "BIGINT"} nil)
+            (create-column! tbl2 {:name (str (name tbl1) "_id")
+                                  :type "BIGINT"} nil)
             (create-table!
              (str (name tbl1) "_" (name tbl2))
              [{:name (str (name tbl1) "_id")
