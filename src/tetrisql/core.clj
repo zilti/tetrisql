@@ -47,14 +47,16 @@ The columns id and meta will be created automatically."
                         (recur
                          (rest fields)
                          (let [field (first fields)]
-                           (rstr (ld) (:name field) (rd) " " (:type field) " " (:args field)
+                           (rstr  stmt
+                                  (ld) (:name field) (rd) " " (:type field) " " (:args field)
                                  (insert-if-not-nil ["DEFAULT "
                                                      (:default field) ""]
                                                     "")
                                  (if (= 1 (count fields))
                                    ""
                                    ", "))))))
-                    ");"))))
+                    ");"))
+    (get-entity :tblname)))
 
 (defn drop-table! "Just as the name says - this drops a table."
   [tblname]
