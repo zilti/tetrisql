@@ -16,20 +16,18 @@
 ;;            :subprotocol "h2"
 ;;            :subname (rstr (-> config/config :server :db-url) "/db")
 ;;            :delimiters ["" ""]})
-;; (defn- ld [] (or(get-in db [:options :delimiters 0])
-;;                 (get-in db [:delimiters 0])))
-;; (defn- rd [] (or(get-in db [:options :delimiters 1])
-;;                 (get-in db [:delimiters 1])))
-(defn- ld [] "")
-(defn- rd [] "")
+(defn- ld [] (or(get-in _default [:options :delimiters 0])
+                (get-in _default [:delimiters 0])))
+(defn- rd [] (or(get-in _default [:options :delimiters 1])
+                (get-in _default [:delimiters 1])))
 
 ;;*****************************************************
 ;; Actions
 ;;*****************************************************
 (defn create-table! "Creates a new table in the database.
 tblname = name of the table.
-columns = a list/vector of maps with five keys: :name, :type, :args, :default, :fulltext?
-args, default and fulltext are optional, the defaults are none, nil and false.
+columns = a list/vector of maps with four keys: :name, :type, :args, :default.
+args and default are optional, the defaults are none.
 The columns id and meta will be created automatically."
   [tblname fields]
   (when-not (table-exists? tblname)
@@ -51,15 +49,15 @@ The columns id and meta will be created automatically."
                          (let [field (first fields)]
                            (rstr (ld) (:name field) (rd) " " (:type field) " " (:args field)
                                  (insert-if-not-nil ["DEFAULT "
-                                                     (rstr
-                                                      (:default field))]
+                                                     (:default field) ""]
                                                     "")
                                  (if (= 1 (count fields))
                                    ""
                                    ", "))))))
                     ");"))))
 
-(defn drop-table! [tblname]
+(defn drop-table! "Just as the name says - this drops a table."
+  [tblname]
   (when (table-exists? tblname)
     (swap! db-config (fn swap-config
                        [config]
@@ -73,16 +71,24 @@ The columns id and meta will be created automatically."
      (rstr
       "DROP TABLE " (ld) (name tblname) (rd) ";"))))
 
-(defn create-column! [tblname col before]
-  (when (table-exists? tblname)
-    (exec-raw
-     (rstr
-      "ALTER TABLE " (ld) (name tblname) (rd) " "
-      "ADD COLUMN IF NOT EXISTS " (ld) (:name col) (rd) " " (:type col) " " (:args col) " "
-      (insert-if-not-nil ["DEFAULT " (:default col)] "")
-      ";"))))
+(defn create-column! "Creates a new column for the table.
+tblname: The name of the table to add the table to.
+col: A column definition as a map. Has the same syntax as in create-table!.
+before: Optional parameter, if used this has to be a column name."
+  ([tblname col]
+     (create-column! tblname col nil))
+  ([tblname col before]
+     (when (table-exists? tblname)
+       (exec-raw
+        (rstr
+         "ALTER TABLE " (ld) (name tblname) (rd) " "
+         "ADD COLUMN IF NOT EXISTS " (ld) (:name col) (rd) " " (:type col) " " (:args col)
+         (insert-if-not-nil [" DEFAULT " (:default col) ""] "")
+         (insert-if-not-nil [(str " BEFORE " (ld)) (:name before) (rd)] "")
+         ";")))))
 
-(defn drop-column! [tblname colname]
+(defn drop-column! "Drops the column of the given name from the table with the given name."
+  [tblname colname]
   (when (table-exists? tblname)
     (exec-raw
      (rstr
@@ -169,7 +175,9 @@ Operators:
                :type "BIGINT"}])))
     (apply-config!)))
 
-(defn drop-relation! [tbl1 relation tbl2]
+(defn drop-relation! "This releases a previously defined relation.
+The syntax is identical to the one at create-relation!."
+  [tbl1 relation tbl2]
   (do
     (swap!
      db-config
@@ -190,16 +198,20 @@ Operators:
             (drop-column! tbl2 {:name (str (name tbl1) "_id")} nil)
             (drop-table! (str (name tbl1) "_" (name tbl2)))))))
 
-(defn bootstrap-entity [tblname]
+(defn bootstrap-entity "This creates a new entity without creating a table.
+The entity is then available via get-entity."
+  [tblname]
   (swap!
    db-config
    #(assoc-in % [:tables (keyword tblname)]
               (create-entity (name tblname)))))
 
-(defn get-entity [tblname]
+(defn get-entity "Returns the entity associated with the given table name."
+  [tblname]
   (get-in @db-config [:tables (keyword tblname)]))
 
-(defn relations-select*
+(defn relations-select* "This prepares a composable select clause to include all relations
+of the given table. Usage: Just as you would use korma's select*."
   [tblname]
   (let [apply-relations
         (fn apply-relations
@@ -218,34 +230,46 @@ Operators:
 ;;*****************************************************
 ;; Utilities
 ;;*****************************************************
-(defn insert-if-not-nil [[prefix value postfix] nilval]
+(defn insert-if-not-nil "Used internally, this will yield a string composed of
+prefix, value and postfix if value is not nil, else it will yield nilval."
+  [[prefix value postfix] nilval]
   (if-not (nil? value)
     (rstr prefix value postfix)
     nilval))
 
-(defn table-exists? [tblname]
+(defn table-exists? "Returns true if the table of the given name exists, else false."
+  [tblname]
   (not (empty? (exec-raw [(str "SHOW COLUMNS FROM " (ld) (name tblname) (rd)) []] :results))))
 
-(defn apply-config! []
-  (if (empty? (select (get-entity :lopia_db_cfg) (where {:key "db_cfg"})))
-    (insert (get-entity :lopia_db_cfg) (values {:key "db_cfg"
-                                                :value (str @db-config)}))
-    (update (get-entity :lopia_db_cfg)
+(defn apply-config! "Stores the internal TetriSQL config into the database."
+  []
+  (if (empty? (select (get-entity :tetris_cfg) (where {:key "db_cfg"})))
+    (insert (get-entity :tetris_cfg) (values {:key "db_cfg"
+                                              :value (str @db-config)}))
+    (update (get-entity :tetris_cfg)
             (set-fields {:value (str @db-config)})
             (where {:key "db_cfg"}))))
 
-(defn load-config! []
-  (when (table-exists? "lopia_db_cfg")
-    (let [result (select (get-entity :lopia_db_cfg) (where {:key "db_cfg"}))]
+(defn load-config! "Loads the internal TetriSQL config from the database."
+  []
+  (when (table-exists? "tetris_cfg")
+    (let [result (select (get-entity :tetris_cfg) (where {:key "db_cfg"}))]
       (swap! db-config
              (fn config-swap
                [_]
                (-> result first :VALUE read-string))))))
 
+(defn col-value "shortcut for setting a column-value instead of an expression at e.g. a column :default."
+  [str]
+  (str (ld) str (rd)))
+
 ;;*****************************************************
 ;; Macros
 ;;*****************************************************
-(defmacro create-table-prefix
+(defmacro create-table-prefix "Creates a function which works the same as create-table,
+but inserts certain columns by default.
+prefixname: A name for the function.
+columns: A list of column definitions, with the same syntax as in create-table!."
   ([prefixname columns]
      `(fn ~prefixname [tblname cols]
         (create-table! tblname (conj cols ~columns))))
@@ -253,15 +277,38 @@ Operators:
      `(fn [tblname cols]
         (create-table! tblname (conj cols ~columns)))))
 
-(defmacro dotbl*
+(defmacro dotbl* "This works the same as insert*, select*, update*, delete* with a little addition
+that you have to say which action to use.
+action: one of insert, select, update or delete.
+tblname: the name of the table."
   [action tblname]
   `(~(symbol (str (name action) "*")) (get-entity ~(keyword (name tblname)))))
 
-(defmacro dotbl
-  [action tblname & body]
-  `(let [query# (-> (dotbl* ~action ~tblname)
-                   ~@body)]
-     (exec query#)))
+(defmacro dotbl "Just as the korma equivalents insert, select, update and delete, this is the
+non-composable variant of dotbl. Additionally, you can also specify the connection you'd like to use."
+  ([action tblname & body]
+     `(let [query# (-> (dotbl* ~action ~tblname)
+                      ~@body)]
+        (exec query#)))
+  ([action conn tblname & body]
+     `(let [query# (-> (dotbl* ~action ~tblname)
+                      ~@body)]
+        (exec query# {:db conn}))))
 
-;; Create a wrapper for connecting to the database b/c of delimiters needed to get extracted
-;; Create possibility so say dbname at actions
+;;*****************************************************
+;; Bootstrap
+;;*****************************************************
+(defn init-tetris "Init TetriSQL with your default database."
+  []
+  (if-not (table-exists? :tetris_cfg)
+    (do
+      (exec-raw (rstr "CREATE TABLE "
+                      (ld) "tetris_cfg" (rd)
+                      " ("
+                      (ld) "id" (rd) " BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                      (ld) "key" (rd) " VARCHAR, "
+                      (ld) "value" (rd) " VARCHAR"
+                      ");"))
+      (bootstrap-entity :tetris_cfg)
+      (apply-config!))
+    (load-config!)))
