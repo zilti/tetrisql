@@ -1,0 +1,11 @@
+pom.xml
+*jar
+*class
+*~
+*#
+wget*
+/lib/
+/classes/
+/targets/
+target/
+.lein-deps-sum
