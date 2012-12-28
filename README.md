@@ -3,6 +3,10 @@
 A drop-in replacement for korma's scarce entity management and a tool to manage your tables and columns.
 
 ## Usage
+Get the game:
+```clojure
+[tetrisql "0.1.0"]
+```
 
 Start the game with
 ```clojure
@@ -11,10 +15,10 @@ Start the game with
 ```
 And choose your options:
 ```clojure
-(defdb h2 {:classname "org.h2.Driver"
-           :subprotocol "h2"
-           :subname "~/db")
-           :delimiters ["\"" "\""]})
+(korma/defdb h2 {:classname "org.h2.Driver"
+                 :subprotocol "h2"
+                 :subname "~/db")
+                 :delimiters [\" \"]})
 ;; Start the game!
 (init-tetris)
 ```
