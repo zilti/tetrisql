@@ -7,20 +7,21 @@ A drop-in replacement for korma's scarce entity management and a tool to manage 
 ### Beginner
 Get the game:
 ```clojure
-[tetrisql "0.1.1-SNAPSHOT"]
+[tetrisql "0.1.2-SNAPSHOT"]
 ```
 
 Start the game with
 ```clojure
-(use 'tetrisql.core)
+(use 'tetrisql.core
+     'korma.incubator.core)
 (require '[korma.db :as korma])
 ```
 And choose your options:
 ```clojure
 (korma/defdb h2 {:classname "org.h2.Driver"
                  :subprotocol "h2"
-                 :subname "~/db")
-                 :delimiters [\" \"]})
+                 :subname "~/db"
+                 :delimiters ["" ""]})
 ;; Start the game!
 (init-tetris)
 ```

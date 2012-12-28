@@ -16,10 +16,10 @@
 ;;            :subprotocol "h2"
 ;;            :subname (rstr (-> config/config :server :db-url) "/db")
 ;;            :delimiters ["" ""]})
-(defn- ld [] (or(get-in _default [:options :delimiters 0])
-                (get-in _default [:delimiters 0])))
-(defn- rd [] (or(get-in _default [:options :delimiters 1])
-                (get-in _default [:delimiters 1])))
+(defn ld [] (or(get-in _default [:options :delimiters 0])
+              (get-in _default [:delimiters 0])))
+(defn rd [] (or(get-in _default [:options :delimiters 1])
+              (get-in _default [:delimiters 1])))
 
 ;;*****************************************************
 ;; Actions
@@ -69,7 +69,7 @@ The columns id and meta will be created automatically."
     (apply-config!)
     (exec-raw
      (rstr
-      "DROP TABLE " (ld) (name tblname) (rd) ";"))))
+      "DROP TABLE " (ld) (name tblname) (rd)))))
 
 (defn create-column! "Creates a new column for the table.
 tblname: The name of the table to add the table to.
@@ -84,8 +84,7 @@ before: Optional parameter, if used this has to be a column name."
          "ALTER TABLE " (ld) (name tblname) (rd) " "
          "ADD COLUMN IF NOT EXISTS " (ld) (:name col) (rd) " " (:type col) " " (:args col)
          (insert-if-not-nil [" DEFAULT " (:default col) ""] "")
-         (insert-if-not-nil [(str " BEFORE " (ld)) (:name before) (rd)] "")
-         ";")))))
+         (insert-if-not-nil [(str " BEFORE " (ld)) (:name before) (rd)] ""))))))
 
 (defn drop-column! "Drops the column of the given name from the table with the given name."
   [tblname colname]
@@ -93,7 +92,7 @@ before: Optional parameter, if used this has to be a column name."
     (exec-raw
      (rstr
       "ALTER TABLE " (ld) (name tblname) (rd) " "
-      "DROP COLUMN IF EXISTS " (name colname) ";"))))
+      "DROP COLUMN IF EXISTS " (name colname)))))
 
 (defn create-relation! "Creates a link between tables.
 Doing this will add columns to the tables.
