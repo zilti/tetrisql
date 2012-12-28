@@ -116,12 +116,12 @@ Operators:
               [config]
               (-> config
                   (assoc-in
-                   [:tables (keyword tbl1) :rel (keyword tbl2)]
+                   [:tables (keyword tbl1) :rel (name tbl2)]
                    (create-rel (-> tbl1 keyword get-entity)
                                (-> tbl2 keyword get-entity)
                                :belongs-to nil))
                   (assoc-in
-                   [:tables (keyword tbl2) :rel (keyword tbl1)]
+                   [:tables (keyword tbl2) :rel (name tbl1)]
                    (create-rel (-> tbl2 keyword get-entity)
                                (-> tbl1 keyword get-entity)
                                :has-many nil)))))
@@ -135,12 +135,12 @@ Operators:
               [config]
               (-> config
                   (assoc-in
-                   [:tables (keyword tbl1) :rel (keyword tbl2)]
+                   [:tables (keyword tbl1) :rel (name tbl2)]
                    (create-rel (-> tbl1 keyword get-entity)
                                (-> tbl2 keyword get-entity)
                                :has-one nil))
                   (assoc-in
-                   [:tables (keyword tbl2) :rel (keyword tbl1)]
+                   [:tables (keyword tbl2) :rel (name tbl1)]
                    (create-rel (-> tbl2 keyword get-entity)
                                (-> tbl1 keyword get-entity)
                                :belongs-to nil)))))
@@ -153,7 +153,7 @@ Operators:
                [config]
                (-> config
                    (assoc-in
-                    [:tables (keyword tbl1) :rel (keyword tbl2)]
+                    [:tables (keyword tbl1) :rel (name tbl2)]
                     (create-rel (-> tbl1 keyword get-entity)
                                 (-> tbl2 keyword get-entity)
                                 :many-to-many
@@ -161,7 +161,7 @@ Operators:
                                  :lfk (str (name tbl1) "_id")
                                  :rfk (str (name tbl2) "_id")}))
                    (assoc-in
-                    [:tables (keyword tbl2) :rel (keyword tbl1)]
+                    [:tables (keyword tbl2) :rel (name tbl1)]
                     (create-rel (-> tbl2 keyword get-entity)
                                 (-> tbl1 keyword get-entity)
                                 :many-to-many
@@ -190,9 +190,9 @@ The syntax is identical to the one at create-relation!."
        [config]
        (-> config
            (update-in
-            [:tables (keyword tbl1) :rel] #(dissoc % (keyword tbl2)))
+            [:tables (keyword tbl1) :rel] #(dissoc % (name tbl2)))
            (update-in
-            [:tables (keyword tbl2) :rel] #(dissoc % (keyword tbl1))))))
+            [:tables (keyword tbl2) :rel] #(dissoc % (name tbl1))))))
     (apply-config!)
     (case relation
       :> (drop-column! tbl1 {:name (str (name tbl2) "_id")} nil)
@@ -267,6 +267,10 @@ prefix, value and postfix if value is not nil, else it will yield nilval."
 (defn col-value "shortcut for setting a column-value instead of an expression at e.g. a column :default."
   [str]
   (str (ld) str (rd)))
+
+(defn ret-id "Extracts the return id from the given insert- or update-action."
+  [res]
+  (-> res first val))
 
 ;;*****************************************************
 ;; Macros
