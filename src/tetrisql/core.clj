@@ -285,15 +285,11 @@ tblname: the name of the table."
   `(~(symbol (str (name action) "*")) (get-entity ~(keyword (name tblname)))))
 
 (defmacro dotbl "Just as the korma equivalents insert, select, update and delete, this is the
-non-composable variant of dotbl. Additionally, you can also specify the connection you'd like to use."
-  ([action tblname & body]
-     `(let [query# (-> (dotbl* ~action ~tblname)
-                      ~@body)]
-        (exec query#)))
-  ([action conn tblname & body]
-     `(let [query# (-> (dotbl* ~action ~tblname)
-                      ~@body)]
-        (exec query# {:db conn}))))
+non-composable variant of dotbl."
+  [action tblname & body]
+  `(let [query# (-> (dotbl* ~action ~tblname)
+                   ~@body)]
+     (exec query#)))
 
 ;;*****************************************************
 ;; Bootstrap

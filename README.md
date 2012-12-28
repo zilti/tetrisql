@@ -7,7 +7,7 @@ A drop-in replacement for korma's scarce entity management and a tool to manage 
 ### Beginner
 Get the game:
 ```clojure
-[tetrisql "0.1.0-SNAPSHOT"]
+[tetrisql "0.1.1-SNAPSHOT"]
 ```
 
 Start the game with
