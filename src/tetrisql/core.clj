@@ -19,9 +19,11 @@
 ;;            :subname (rstr (-> config/config :server :db-url) "/db")
 ;;            :delimiters ["" ""]})
 (defn ld [] (or(get-in @_default [:options :delimiters 0])
-              (get-in _default [:delimiters 0])))
+              (get-in _default [:delimiters 0])
+              "\""))
 (defn rd [] (or(get-in @_default [:options :delimiters 1])
-              (get-in _default [:delimiters 1])))
+              (get-in _default [:delimiters 1])
+              "\""))
 
 ;;*****************************************************
 ;; Actions
