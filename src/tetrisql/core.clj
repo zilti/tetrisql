@@ -1,6 +1,8 @@
 (ns tetrisql.core
   (:use korma.db
-        korma.incubator.core))
+        korma.incubator.core)
+  (:require [clojure.string :as string]
+            [taoensso.nippy :as nippy]))
 
 (declare insert-if-not-nil)
 (declare drop-relation!)
@@ -16,9 +18,9 @@
 ;;            :subprotocol "h2"
 ;;            :subname (rstr (-> config/config :server :db-url) "/db")
 ;;            :delimiters ["" ""]})
-(defn ld [] (or(get-in _default [:options :delimiters 0])
+(defn ld [] (or(get-in @_default [:options :delimiters 0])
               (get-in _default [:delimiters 0])))
-(defn rd [] (or(get-in _default [:options :delimiters 1])
+(defn rd [] (or(get-in @_default [:options :delimiters 1])
               (get-in _default [:delimiters 1])))
 
 ;;*****************************************************
@@ -103,7 +105,7 @@ Operators:
 :> many-to-one - the left-hand table gets a new column \"table2_id\"
 :< one-to-many - the right-hand table gets a new column \"table1_id\"
 := one-to-one - the right-hand table gets a new column \"table1_id\"
-:>< many-to-many - a link-table named \"table1_table2\" is created, and both tables get a new column.
+:>< many-to-many - a link-table named \"table1_table2\" is created.
 \"key :< doors\" is the same as \"doors :> key\""
   [tbl1 relation tbl2]
   (let [ent-tbl1 (get-in @db-config [:tables (keyword tbl1)])
@@ -211,6 +213,64 @@ The entity is then available via get-entity."
    #(assoc-in % [:tables (keyword tblname)]
               (create-entity (name tblname)))))
 
+;;*****************************************************
+;; Intern Utilities
+;;*****************************************************
+(defn- correct-case-key
+  [key]
+  (if-let [case-fun (-> @_default :options :naming :keys)]
+    (apply (comp keyword case-fun) [(name key)])
+    (keyword key)))
+
+(defn- resolve-has-one
+  [result])
+
+(defn- resolve-has-many
+  [result])
+
+(defn- resolve-belongs-to
+  [result])
+
+(defn- resolve-many-to-many
+  [result])
+
+;;*****************************************************
+;; Utilities
+;;*****************************************************
+(defn insert-if-not-nil "Used internally, this will yield a string composed of
+prefix, value and postfix if value is not nil, else it will yield nilval."
+  [[prefix value postfix] nilval]
+  (if-not (nil? value)
+    (rstr prefix value postfix)
+    nilval))
+
+(defn table-exists? "Returns true if the table of the given name exists, else false."
+  [tblname]
+  (not (empty? (exec-raw [(str "SHOW COLUMNS FROM " (ld) (name tblname) (rd)) []] :results))))
+
+(defn apply-config! "Stores the internal TetriSQL config into the database."
+  []
+  (if (empty? (select (get-entity :tetris_cfg) (where {:key "db_cfg"})))
+    (exec-raw ["INSERT INTO tetris_cfg (key, value) VALUES (?, ?)" ["db_cfg" (nippy/freeze-to-bytes @db-config)]])
+    (exec-raw ["UPDATE tetris_cfg SET value = ? WHERE key = ?" [(nippy/freeze-to-bytes @db-config) "db_cfg"]])))
+
+(defn load-config! "Loads the internal TetriSQL config from the database."
+  []
+  (when (table-exists? "tetris_cfg")
+    (let [result (select (get-entity :tetris_cfg) (where {:key "db_cfg"}))]
+      (swap! db-config
+             (fn config-swap
+               [_]
+               (-> result first ((correct-case-key :VALUE)) nippy/thaw-from-bytes))))))
+
+(defn col-value "shortcut for setting a column-value instead of an expression at e.g. a column :default."
+  [str]
+  (str (ld) str (rd)))
+
+(defn ret-id "Extracts the return id from the given insert- or update-action."
+  [res]
+  (-> res first val))
+
 (defn get-entity "Returns the entity associated with the given table name."
   [tblname]
   (get-in @db-config [:tables (keyword tblname)]))
@@ -231,46 +291,6 @@ of the given table. Usage: Just as you would use korma's select*."
     (-> (select* (get-entity tblname))
         apply-relations)
     ))
-
-;;*****************************************************
-;; Utilities
-;;*****************************************************
-(defn insert-if-not-nil "Used internally, this will yield a string composed of
-prefix, value and postfix if value is not nil, else it will yield nilval."
-  [[prefix value postfix] nilval]
-  (if-not (nil? value)
-    (rstr prefix value postfix)
-    nilval))
-
-(defn table-exists? "Returns true if the table of the given name exists, else false."
-  [tblname]
-  (not (empty? (exec-raw [(str "SHOW COLUMNS FROM " (ld) (name tblname) (rd)) []] :results))))
-
-(defn apply-config! "Stores the internal TetriSQL config into the database."
-  []
-  (if (empty? (select (get-entity :tetris_cfg) (where {:key "db_cfg"})))
-    (insert (get-entity :tetris_cfg) (values {:key "db_cfg"
-                                              :value (str @db-config)}))
-    (update (get-entity :tetris_cfg)
-            (set-fields {:value (str @db-config)})
-            (where {:key "db_cfg"}))))
-
-(defn load-config! "Loads the internal TetriSQL config from the database."
-  []
-  (when (table-exists? "tetris_cfg")
-    (let [result (select (get-entity :tetris_cfg) (where {:key "db_cfg"}))]
-      (swap! db-config
-             (fn config-swap
-               [_]
-               (-> result first :VALUE read-string))))))
-
-(defn col-value "shortcut for setting a column-value instead of an expression at e.g. a column :default."
-  [str]
-  (str (ld) str (rd)))
-
-(defn ret-id "Extracts the return id from the given insert- or update-action."
-  [res]
-  (-> res first val))
 
 ;;*****************************************************
 ;; Macros
@@ -312,8 +332,17 @@ non-composable variant of dotbl."
                       " ("
                       (ld) "id" (rd) " BIGINT AUTO_INCREMENT PRIMARY KEY, "
                       (ld) "key" (rd) " VARCHAR, "
-                      (ld) "value" (rd) " VARCHAR"
+                      (ld) "value" (rd) " BINARY"
                       ");"))
       (bootstrap-entity :tetris_cfg)
       (apply-config!))
-    (load-config!)))
+    (do
+      (bootstrap-entity :tetris_cfg)
+      (load-config!))))
+
+;; (korma.db/defdb h2 {:classname "org.h2.Driver"
+;;                     :subprotocol "h2"
+;;                     :subname "mem:"
+;;                     :delimiters ["" ""]
+;;                     :naming {:keys string/lower-case}})
+;(init-tetris)
