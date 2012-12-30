@@ -207,6 +207,24 @@ The syntax is identical to the one at create-relation!."
             (drop-column! tbl2 {:name (str (name tbl1) "_id")} nil)
             (drop-table! (str (name tbl1) "_" (name tbl2)))))))
 
+(defn merge-multires "This function re-orders your dependency-including result set. If you have a has-many relationship, you would get a result map for each dependency your result has. When having multiple results this can get difficult to process.
+This function solves that by putting all relations into one:
+ [{:id 1 :foo \"bar\" :baz 1 :boo 2} {:id 1 :foo \"bar\" :baz 2 :boo 4}
+ {:id 2 :foo \"bar\" :baz 3 :boo 4}]
+apply (merge-multires result [] :id [:baz :boo]) and get:
+ [{:id 1 :foo \"bar\" [{:baz 1 :boo 2}{:baz 2 :boo 4}]}
+  {:id 2 :foo \"bar\" [{:baz 3 :boo 4}]}]
+Notice that in practice this only allows you one has-many dependency to get merged."
+  [result target-map id tblkeys]
+  (if-let [entry (first result)]
+    (if (nil? (target-map (id entry)))
+      (merge-multires result (assoc target-map (id entry) []) id tblkeys)
+      (merge-multires (rest result)
+                      (update-in target-map [(id entry)]
+                                 #(conj %
+                                        (select-keys entry tblkeys))) id tblkeys))
+    target-map))
+
 (defn bootstrap-entity "This creates a new entity without creating a table.
 The entity is then available via get-entity."
   [tblname]
