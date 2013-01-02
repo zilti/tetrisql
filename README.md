@@ -7,7 +7,7 @@ A drop-in replacement for korma's scarce entity management and a tool to manage 
 ### Beginner
 Get the game:
 ```clojure
-[tetrisql "0.1.8-SNAPSHOT"]
+[tetrisql "0.1.9-SNAPSHOT"]
 ```
 
 Start the game with
@@ -76,7 +76,7 @@ Or just throw them all away
 
 Your game will be saved automatically.
 
-### Expert
+### Advanced
 TetriSQL has a drop-in replacement for Korma's modification statements.
 If they're not sufficient at one place, you can still fall back to use the default ones and get your entities like this:
 ```clojure
@@ -86,8 +86,43 @@ If they're not sufficient at one place, you can still fall back to use the defau
 (relations-select* :tblname) ;; Prepares a korma select* statement to include all relations.
 ```
 
+### Expert
+####Reorganize your result sets
+If you like to work with korma's exec-raw and custom SQL code, TetriSQL has a little present for you:
+merge-multires.
+If you use JOIN statements and have to-many or many-to-many relationships (and probably multiple of those), things can get ugly.
+Consider three tables users, groups and time. users has a has-many relationship to time, and users and groups have a join table users_groups because they're many-to-many.
+You'll probably end up with something like this:
+```clojure
+(korma/exec-raw "SELECT * FROM users
+JOIN users_groups ON users_groups.users_id = users.uid
+JOIN groups ON groups.gid = users_groups.groups_id
+JOIN time ON time.users_id = users.uid" :results)
+;; Result set:
+[{:users_id_2 1, :time 5, :tid 1, :gname "administrators", :gid 1, :groups_id 1, :users_id 1, :uname "zilti", :uid 1} 
+{:users_id_2 1, :time 10, :tid 2, :gname "administrators", :gid 1, :groups_id 1, :users_id 1, :uname "zilti", :uid 1} 
+{:users_id_2 1, :time 5, :tid 1, :gname "users", :gid 2, :groups_id 2, :users_id 1, :uname "zilti", :uid 1} 
+{:users_id_2 1, :time 10, :tid 2, :gname "users", :gid 2, :groups_id 2, :users_id 1, :uname "zilti", :uid 1} 
+{:users_id_2 2, :time 2, :tid 3, :gname "users", :gid 2, :groups_id 2, :users_id 2, :uname "blah", :uid 2}]
+```
+Now that's one hell of an ugly result set!
+:uid is the primary key here, and because of the multiple relationships you see that :uid 1 appears 4 times.
+Let's sort that stuff! Define which tables contain which columns:
+```clojure
+;; Key-mapping
+{:groups [:gid :gname], :time [:tid :time]}
+```
+Now put both things together:
+```clojure
+(merge-multires result-set :uid key-mapping)
+;; New result set:
+{2 {:uid 2, :uname "blah", :users_id 2, :groups_id 2, :users_id_2 2, :time [{:time 2, :tid 3}], :groups [{:gname "users", :gid 2}]}, 
+1 {:uid 1, :uname "zilti", :users_id 1, :groups_id 2, :users_id_2 1, :time [{:time 5, :tid 1} {:time 10, :tid 2}], :groups [{:gname "administrators", :gid 1} {:gname "users", :gid 2}]}}
+```
+
+
 ## License
 
-Copyright © 2012 Daniel Ziltener
+Copyright © 2013 Daniel Ziltener
 
 Distributed under the Eclipse Public License, the same as Clojure.

@@ -207,23 +207,57 @@ The syntax is identical to the one at create-relation!."
             (drop-column! tbl2 {:name (str (name tbl1) "_id")} nil)
             (drop-table! (str (name tbl1) "_" (name tbl2)))))))
 
-(defn merge-multires "This function re-orders your dependency-including result set. If you have a has-many relationship, you would get a result map for each dependency your result has. When having multiple results this can get difficult to process.
-This function solves that by putting all relations into one:
- [{:id 1 :foo \"bar\" :baz 1 :boo 2} {:id 1 :foo \"bar\" :baz 2 :boo 4}
- {:id 2 :foo \"bar\" :baz 3 :boo 4}]
-apply (merge-multires result [] :id [:baz :boo]) and get:
- [{:id 1 :foo \"bar\" [{:baz 1 :boo 2}{:baz 2 :boo 4}]}
-  {:id 2 :foo \"bar\" [{:baz 3 :boo 4}]}]
-Notice that in practice this only allows you one has-many dependency to get merged."
-  [result target-map id tblkeys]
-  (if-let [entry (first result)]
-    (if (nil? (target-map (id entry)))
-      (merge-multires result (assoc target-map (id entry) []) id tblkeys)
-      (merge-multires (rest result)
-                      (update-in target-map [(id entry)]
-                                 #(conj %
-                                        (select-keys entry tblkeys))) id tblkeys))
-    target-map))
+(defn- contains-map?
+  [coll cmap]
+  (reduce (fn [bool entry]
+            (if (= entry cmap)
+              true bool))
+          false
+          coll))
+
+(defn merge-multires "This function reorganizes your result data:
+Think of this result-set:
+ [{:users_id_2 1, :time 5, :tid 1, :gname \"administrators\", :gid 1, :groups_id 1, :users_id 1, :uname \"zilti\", :uid 1}
+ {:users_id_2 1, :time 10, :tid 2, :gname \"administrators\", :gid 1, :groups_id 1, :users_id 1, :uname \"zilti\", :uid 1}
+ {:users_id_2 1, :time 5, :tid 1, :gname \"users\", :gid 2, :groups_id 2, :users_id 1, :uname \"zilti\", :uid 1}
+ {:users_id_2 1, :time 10, :tid 2, :gname \"users\", :gid 2, :groups_id 2, :users_id 1, :uname \"zilti\", :uid 1}
+ {:users_id_2 2, :time 2, :tid 3, :gname \"users\", :gid 2, :groups_id 2, :users_id 2, :uname \"blah\", :uid 2}]
+
+Now, you have the entry with uid 1 four times because of its dependencies. What about turning that into one and nesting the entries?
+You have two tables joined in, :groups and :time. Define a key-mapping:
+ {:groups [:gid :gname], :time [:tid :time]}
+Primary key is :uid.
+Now this: (merge-multires result-set :uid key-mapping)
+Turns into this:
+ {2 {:uid 2, :uname \"blah\", :users_id 2, :groups_id 2, :users_id_2 2, :time [{:time 2, :tid 3}], :groups [{:gname \"users\", :gid 2}]},
+1 {:uid 1, :uname \"zilti\", :users_id 1, :groups_id 2, :users_id_2 1, :time [{:time 5, :tid 1} {:time 10, :tid 2}], :groups [{:gname \"administrators\", :gid 1} {:gname \"users\", :gid 2}]}}"
+  [result pk key-mapping]
+  (reduce
+   (fn [new-result record]
+     (let [new-result (if (contains? new-result (record pk))
+                        new-result
+                        (assoc new-result (record pk) {}))]
+       (reduce
+        (fn [[key-mapping record new-result] i]
+          (if-not (empty? key-mapping)
+            (if (contains? (new-result (record pk)) (key (first key-mapping)))
+              [(dissoc key-mapping (key (first key-mapping)))
+               (apply dissoc record (val (first key-mapping)))
+               (if (contains-map?
+                    ((new-result (record pk)) (key (first key-mapping)))
+                    (select-keys record (val (first key-mapping))))
+                 new-result
+                 (update-in new-result [(record pk) (key (first key-mapping))]
+                            #(conj % (select-keys record (val (first key-mapping))))))]
+              (recur [key-mapping
+                      record
+                      (assoc-in new-result [(record pk) (key (first key-mapping))] [])] i))
+            (update-in new-result [(record pk)] #(merge % record))))
+        [key-mapping record new-result]
+        (range (inc (count key-mapping))))))
+   {}
+   result))
+
 
 (defn bootstrap-entity "This creates a new entity without creating a table.
 The entity is then available via get-entity."
